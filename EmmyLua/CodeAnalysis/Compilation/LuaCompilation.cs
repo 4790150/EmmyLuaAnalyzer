@@ -2,6 +2,7 @@
 using EmmyLua.CodeAnalysis.Compilation.Analyzer.DeclarationAnalyzer;
 using EmmyLua.CodeAnalysis.Compilation.Analyzer.FlowAnalyzer;
 using EmmyLua.CodeAnalysis.Compilation.Analyzer.ResolveAnalyzer;
+using EmmyLua.CodeAnalysis.Compilation.Analyzer.TypeAnalyzer;
 using EmmyLua.CodeAnalysis.Compilation.Index;
 using EmmyLua.CodeAnalysis.Compilation.Search;
 using EmmyLua.CodeAnalysis.Compilation.Semantic;
@@ -43,6 +44,7 @@ public class LuaCompilation
             new DeclarationAnalyzer(this),
             new FlowAnalyzer(this),
             new ResolveAnalyzer(this),
+            new TypeAnalyzer(this),
         ];
         Diagnostics = new LuaDiagnostics(this);
     }
