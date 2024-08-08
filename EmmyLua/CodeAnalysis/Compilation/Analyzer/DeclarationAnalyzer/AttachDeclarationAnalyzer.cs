@@ -300,6 +300,10 @@ public class AttachDeclarationAnalyzer(
 
                     declaration.Type = parameterInfo.Type;
                 }
+                else
+                {
+                    declaration.Type = Builtin.Unknown;
+                }
             }
         }
 

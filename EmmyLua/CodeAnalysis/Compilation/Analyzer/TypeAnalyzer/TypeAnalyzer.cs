@@ -5,6 +5,8 @@ using EmmyLua.CodeAnalysis.Compilation.Search;
 using EmmyLua.CodeAnalysis.Compilation.Symbol;
 using EmmyLua.CodeAnalysis.Syntax.Node;
 using EmmyLua.CodeAnalysis.Syntax.Node.SyntaxNodes;
+using EmmyLua.CodeAnalysis.Type;
+using System.Security.AccessControl;
 using System.Xml.Linq;
 
 namespace EmmyLua.CodeAnalysis.Compilation.Analyzer.TypeAnalyzer
@@ -206,11 +208,86 @@ namespace EmmyLua.CodeAnalysis.Compilation.Analyzer.TypeAnalyzer
                         AnalyzeTagSource(sourceSyntax);
                         break;
                     }
+                case LuaCallExprSyntax callExprSyntax:
+                    {
+                        AnalyzeCallExpr(callExprSyntax);
+                        break;
+                    }
             }
 
             foreach (var child in node.ChildrenNode)
             {
                 AnalyzeNode(child, syntaxTree);
+            }
+        }
+
+
+        private void AnalyzeCallExpr(LuaCallExprSyntax callExprSyntax)
+        {
+            if (null == callExprSyntax.ArgList)
+                return;
+
+            var fun = callExprSyntax.PrefixExpr;
+            var funType = searchContext.Infer(fun);
+            if (funType is LuaMethodType methodType)
+            {
+                var parameters = methodType.MainSignature.Parameters;
+                var argList = new List<LuaExprSyntax>(callExprSyntax.ArgList.ArgList);
+                if (argList.Count > parameters.Count)
+                {
+                    callExprSyntax.Tree.PushDiagnostic(new Diagnostics.Diagnostic(Diagnostics.DiagnosticSeverity.Error,
+                        Diagnostics.DiagnosticCode.Unused,
+                        $"method {callExprSyntax.Name} don't takes {argList.Count} arguments",
+                        callExprSyntax.Range));
+                }
+
+                bool colonDefine = methodType.ColonDefine;
+                bool colonCall = false;
+                if (fun is LuaIndexExprSyntax indexExpr)
+                {
+                    colonCall = indexExpr.IsColonIndex;
+                }
+
+                int indexArg = 0;
+                int indexParam = 0;
+                switch ((colonCall, colonDefine))
+                {
+                    case (true, false):
+                        {
+                            indexParam++;
+                            break;
+                        }
+                    case (false, true):
+                        {
+                            //ParamMatch(searchContext.Infer(indexExpr.PrefixExpr));
+                            indexArg++;
+                            break;
+                        }
+                }
+
+                for (; indexArg < argList.Count; indexArg++)
+                {
+                    if (indexParam < parameters.Count)
+                    {
+                        ParamMatch(parameters[indexParam]?.Type, argList[indexArg]);
+                    }
+                    indexParam++;
+                }
+            }
+        }
+
+        private void ParamMatch(LuaType? parameterType, LuaExprSyntax arg)
+        {
+            if (parameterType != null && parameterType != Builtin.Unknown)
+            {
+                var argType = searchContext.Infer(arg);
+                if (argType == Builtin.Unknown || (!argType.IsSameType(parameterType, searchContext) && !argType.SubTypeOf(parameterType, searchContext)))
+                {
+                    arg.Tree.PushDiagnostic(new Diagnostics.Diagnostic(Diagnostics.DiagnosticSeverity.Error,
+                        Diagnostics.DiagnosticCode.TypeNotMatch,
+                        $"TypeNotMatch {parameterType} = {argType}",
+                        arg.Range));
+                }
             }
         }
 
