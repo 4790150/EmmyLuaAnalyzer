@@ -36,6 +36,11 @@ public class LuaNamedType(LuaDocumentId documentId, string name)
     {
         return substitution.Substitute(Name, this);
     }
+
+    public override string ToString()
+    {
+        return Name;
+    }
 }
 
 public class LuaTemplateType(string prefixName, string templateName)

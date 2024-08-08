@@ -304,12 +304,12 @@ public class ResolveAnalyzer(LuaCompilation compilation) : LuaAnalyzer(compilati
                 Context.Compilation.TypeManager.AddDocumentElementType(declaration.UniqueId);
                 Context.Compilation.TypeManager.SetBaseType(declaration.UniqueId, type);
             }
-            else if (luaExpr is LuaCallExprSyntax)
-            {
-                declaration.Type = new LuaElementType(declaration.UniqueId);
-                Context.Compilation.TypeManager.AddDocumentElementType(declaration.UniqueId);
-                Context.Compilation.TypeManager.SetBaseType(declaration.UniqueId, type);
-            }
+            //else if (luaExpr is LuaCallExprSyntax)
+            //{
+            //    declaration.Type = new LuaElementType(declaration.UniqueId);
+            //    Context.Compilation.TypeManager.AddDocumentElementType(declaration.UniqueId);
+            //    Context.Compilation.TypeManager.SetBaseType(declaration.UniqueId, type);
+            //}
             else
             {
                 declaration.Type = type;
