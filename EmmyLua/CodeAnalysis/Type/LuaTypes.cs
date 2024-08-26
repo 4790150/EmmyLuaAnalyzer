@@ -236,11 +236,13 @@ public class LuaMultiReturnType : LuaType
     }
 }
 
-public class LuaSignature(LuaType returnType, List<LuaSymbol> parameters)
+public class LuaSignature(LuaType returnType, List<LuaSymbol> parameters, LuaSymbol? self)
 {
     public LuaType ReturnType { get; set; } = returnType;
 
     public List<LuaSymbol> Parameters { get; } = parameters;
+
+    public LuaSymbol? Self { get; } = self;
 
     public LuaSignature Instantiate(TypeSubstitution substitution)
     {
@@ -248,7 +250,7 @@ public class LuaSignature(LuaType returnType, List<LuaSymbol> parameters)
         var newParameters = Parameters
             .Select(parameter => parameter.Instantiate(substitution))
             .ToList();
-        return new LuaSignature(newReturnType, newParameters);
+        return new LuaSignature(newReturnType, newParameters, self);
     }
 }
 
@@ -261,8 +263,8 @@ public class LuaMethodType(LuaSignature mainSignature, List<LuaSignature>? overl
 
     public bool ColonDefine { get; } = colonDefine;
 
-    public LuaMethodType(LuaType returnType, List<LuaSymbol> parameters, bool colonDefine)
-        : this(new LuaSignature(returnType, parameters), null, colonDefine)
+    public LuaMethodType(LuaType returnType, List<LuaSymbol> parameters, bool colonDefine, LuaSymbol? self)
+        : this(new LuaSignature(returnType, parameters, self), null, colonDefine)
     {
     }
 

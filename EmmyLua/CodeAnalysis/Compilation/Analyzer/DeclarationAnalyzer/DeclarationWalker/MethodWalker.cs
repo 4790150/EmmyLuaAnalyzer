@@ -93,7 +93,28 @@ public partial class DeclarationWalker
             }
         }
 
+        var funcStat = closureExprSyntax.Parent as LuaFuncStatSyntax;
+        var isColonDefine = funcStat == null ? false : funcStat.IsColonFunc;
+
         var parameters = new List<LuaSymbol>();
+
+        LuaSymbol? self = null;
+        if (isColonDefine && null != funcStat && null != funcStat.IndexExpr && null != funcStat.IndexExpr.PrefixExpr)
+        {
+            var prefixExpr = funcStat.IndexExpr.PrefixExpr;
+            self = new LuaSymbol(
+                "self",
+                Builtin.Unknown,
+                new ParamInfo(
+                    new(prefixExpr),
+                    false
+                ),
+                SymbolFeature.Local
+            );
+            declarationContext.TypeManager.AddDocumentElementType(prefixExpr.UniqueId);
+            declarationContext.AddLocalDeclaration(prefixExpr, self);
+        }
+
         if (closureExprSyntax.ParamList is { } paramList)
         {
             foreach (var param in paramList.Params)
@@ -141,11 +162,12 @@ public partial class DeclarationWalker
             }
         }
 
-        var isColonDefine = closureExprSyntax.Parent is LuaFuncStatSyntax { IsColonFunc: true };
+        
         var method = new LuaMethodType(
             new LuaSignature(
                 Builtin.Unknown,
-                parameters.ToList()
+                parameters.ToList(),
+                self
             ),
             null,
             isColonDefine);

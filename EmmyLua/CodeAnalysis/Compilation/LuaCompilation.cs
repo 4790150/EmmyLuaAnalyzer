@@ -143,7 +143,8 @@ public class LuaCompilation
                     }
                 }
 
-                var analyzeContext = new AnalyzeContext(documents);
+                var searchContext = new SearchContext(this, new SearchContextFeatures() { });
+                var analyzeContext = new AnalyzeContext(documents, searchContext);
                 foreach (var analyzer in Analyzers)
                 {
                     Project.Monitor?.OnAnalyzing(analyzer.Name);

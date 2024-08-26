@@ -32,6 +32,8 @@ public class LuaSyntaxTree
 
     public LuaSourceSyntax SyntaxRoot => (GetElement(0) as LuaSourceSyntax)!;
 
+    public Dictionary<int, LuaSyntaxElement> SyntaxCache = new();
+
     public BinderData? BinderData { get; internal set; }
 
     public static LuaSyntaxTree ParseText(string text, LuaLanguage language)
@@ -66,6 +68,7 @@ public class LuaSyntaxTree
 
     private void InitNodes()
     {
+        SyntaxCache.Clear();
         TokenAnalyzer.Analyze(RedNodes.Count, this);
         BinderAnalyzer.Analyze(SyntaxRoot, this);
     }
@@ -75,6 +78,11 @@ public class LuaSyntaxTree
         if (elementId < 0 || elementId >= RedNodes.Count)
         {
             return null;
+        }
+
+        if (SyntaxCache.TryGetValue(elementId, out var element))
+        {
+            return element;
         }
 
         return SyntaxFactory.CreateSyntax(elementId, this);

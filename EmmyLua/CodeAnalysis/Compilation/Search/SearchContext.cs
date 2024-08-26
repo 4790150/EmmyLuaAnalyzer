@@ -169,7 +169,7 @@ public class SearchContext
 
                 if (!founded && !Compilation.Project.Features.TypeCallStrict)
                 {
-                    var luaMethod = new LuaMethodType(namedType, [], false);
+                    var luaMethod = new LuaMethodType(namedType, [], false, null);
                     action(luaMethod);
                 }
 

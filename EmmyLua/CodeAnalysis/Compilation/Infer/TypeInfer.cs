@@ -119,7 +119,7 @@ public static class TypeInfer
             returnType = new LuaMultiReturnType(returnTypes);
         }
 
-        return new LuaMethodType(returnType, typedParameters, false);
+        return new LuaMethodType(returnType, typedParameters, false, null);
     }
 
     private static LuaType InferNameType(LuaDocNameTypeSyntax nameType, SearchContext context)

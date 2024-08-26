@@ -10,11 +10,12 @@ public class ResolveAnalyzer(LuaCompilation compilation) : LuaAnalyzer(compilati
 
     public override void Analyze(AnalyzeContext analyzeContext)
     {
-        Context = new(Compilation, new SearchContextFeatures()
-        {
-            Cache = true,
-            CacheUnknown = false,
-        });
+        //Context = new(Compilation, new SearchContextFeatures()
+        //{
+        //    Cache = true,
+        //    CacheUnknown = false,
+        //});
+        Context = analyzeContext.SearchContext;
 
         var resolveDependencyGraph = new ResolveDependencyGraph(Context, analyzeContext);
         resolveDependencyGraph.OnResolved += (unResolved, state) =>
@@ -172,6 +173,20 @@ public class ResolveAnalyzer(LuaCompilation compilation) : LuaAnalyzer(compilati
             var typeInfo = Compilation.TypeManager.FindTypeInfo(id);
             if (typeInfo?.BaseType is LuaMethodType methodType)
             {
+                var self = methodType.MainSignature.Self;
+                if (self != null && Builtin.Unknown.IsSameType(self.Type, Context))
+                {
+                    self.Type = Context.Infer(self.Info.Ptr.ToNode(Context));
+                }
+
+                foreach (var param in methodType.MainSignature.Parameters)
+                {
+                    if (Builtin.Unknown.IsSameType(param.Type, Context))
+                    {
+                        param.Type = Context.Infer(param.Info.Ptr.ToNode(Context));
+                    }
+                }
+
                 if (methodType.MainSignature.ReturnType.IsSameType(Builtin.Unknown, Context))
                 {
                     var block = unResolvedMethod.Block;

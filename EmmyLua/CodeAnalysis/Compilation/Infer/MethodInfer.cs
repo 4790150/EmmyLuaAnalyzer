@@ -347,6 +347,6 @@ public static class MethodInfer
             }
         }
 
-        return new LuaSignature(newReturnType, newParameters);
+        return new LuaSignature(newReturnType, newParameters, signature.Self);
     }
 }

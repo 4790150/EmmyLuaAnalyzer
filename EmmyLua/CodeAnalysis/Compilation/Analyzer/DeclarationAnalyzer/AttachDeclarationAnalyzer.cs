@@ -311,14 +311,14 @@ public class AttachDeclarationAnalyzer(
         {
             methodType = new LuaGenericMethodType(
                 genericParams,
-                new LuaSignature(methodType.MainSignature.ReturnType, parameters),
+                new LuaSignature(methodType.MainSignature.ReturnType, parameters, methodType.MainSignature.Self),
                 overloads,
                 methodType.ColonDefine);
         }
         else
         {
             methodType = new LuaMethodType(
-                new LuaSignature(methodType.MainSignature.ReturnType, parameters),
+                new LuaSignature(methodType.MainSignature.ReturnType, parameters, methodType.MainSignature.Self),
                 overloads,
                 methodType.ColonDefine);
         }
