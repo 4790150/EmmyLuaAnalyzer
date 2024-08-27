@@ -315,7 +315,8 @@ public class ResolveAnalyzer(LuaCompilation compilation) : LuaAnalyzer(compilati
                                         type.IsSameType(Builtin.UserData, Context)
                 ))
             {
-                declaration.Type = new LuaElementType(declaration.UniqueId);
+                //declaration.Type = new LuaElementType(declaration.UniqueId);
+                declaration.Type = type;
                 Context.Compilation.TypeManager.AddDocumentElementType(declaration.UniqueId);
                 Context.Compilation.TypeManager.SetBaseType(declaration.UniqueId, type);
             }

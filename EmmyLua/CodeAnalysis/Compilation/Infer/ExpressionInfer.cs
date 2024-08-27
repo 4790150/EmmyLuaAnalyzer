@@ -135,6 +135,12 @@ public static class ExpressionInfer
             {
                 return localType;
             }
+            else
+            {
+                var retType = new LuaElementType(tableExpr.UniqueId);
+                context.SetCacheType(localNameElement, retType);
+                return retType;
+            }
         }
         else if (tableExpr.Parent is LuaAssignStatSyntax assignStatSyntax)
         {
@@ -144,6 +150,12 @@ public static class ExpressionInfer
             if (!globalType.IsSameType(Builtin.Unknown, context))
             {
                 return globalType;
+            }
+            else
+            {
+                var retType = new LuaElementType(tableExpr.UniqueId);
+                context.SetCacheType(nameElement, retType);
+                return retType;
             }
         }
 

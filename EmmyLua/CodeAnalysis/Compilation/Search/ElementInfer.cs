@@ -74,4 +74,8 @@ public class ElementInfer(SearchContext context)
         }
     }
 
+    public void SetCacheType(SyntaxElementId elementId, LuaType luaType)
+    {
+        InferCaches[elementId] = luaType;
+    }
 }

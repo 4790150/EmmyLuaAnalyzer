@@ -30,6 +30,25 @@ namespace EmmyLua.CodeAnalysis.Compilation.Analyzer.TypeAnalyzer
             }
         }
 
+        public bool MatchType(LuaType? leftType, LuaType? rightType)
+        {
+            if (null == leftType)return false;
+            if (null == rightType)return false;
+            if (null == searchContext) return false;
+
+            if (Builtin.Any.IsSameType(leftType, searchContext))
+                return true;
+            if (Builtin.Number.IsSameType(leftType, searchContext) && Builtin.Integer.IsSameType(rightType, searchContext))
+                return true;
+
+            if (leftType.IsSameType(rightType, searchContext))
+                return true;
+            if (rightType.SubTypeOf(leftType, searchContext))
+                return true;
+
+            return false;
+        }
+
         private void AnalyzeNode(LuaSyntaxNode node, Syntax.Tree.LuaSyntaxTree syntaxTree)
         {
             switch (node)
@@ -225,6 +244,8 @@ namespace EmmyLua.CodeAnalysis.Compilation.Analyzer.TypeAnalyzer
 
         private void AnalyzeCallExpr(LuaCallExprSyntax callExprSyntax)
         {
+            if (null == searchContext)
+                return;
             if (null == callExprSyntax.ArgList)
                 return;
 
@@ -232,13 +253,6 @@ namespace EmmyLua.CodeAnalysis.Compilation.Analyzer.TypeAnalyzer
             var funType = searchContext.Infer(fun);
             if (funType is LuaMethodType methodType)
             {
-                var parameters = new List<LuaSymbol>();
-                if (methodType.MainSignature.Self != null)
-                {
-                    parameters.Add(methodType.MainSignature.Self);
-                }
-                parameters.AddRange(methodType.MainSignature.Parameters);
-
                 var argTypes = new List<LuaType>();
                 if (fun is LuaIndexExprSyntax indexExpr && indexExpr.IsColonIndex)
                 {
@@ -250,7 +264,57 @@ namespace EmmyLua.CodeAnalysis.Compilation.Analyzer.TypeAnalyzer
                     argTypes.Add(searchContext.Infer(arg));
                 }
 
-                if (argTypes.Count > parameters.Count)
+                var parameterSymbols = new List<LuaSymbol>();
+                if (methodType.MainSignature.Self != null)
+                {
+                    parameterSymbols.Add(methodType.MainSignature.Self);
+                }
+                parameterSymbols.AddRange(methodType.MainSignature.Parameters);
+
+                var paramTypes = new List<LuaType?>();
+                if (methodType is LuaGenericMethodType genericMethodType)
+                {
+                    Dictionary<string, LuaType> genericTypes = new Dictionary<string, LuaType>();
+
+                    for (int i = 0; i < parameterSymbols.Count; i++)
+                    {
+                        if (parameterSymbols[i].Type is LuaNamedType nameType)
+                        {
+                            if (genericMethodType.GenericParams.ContainsKey(nameType.Name))
+                            {
+                                if (i < argTypes.Count)
+                                {
+                                    var argType = argTypes[i];
+                                    paramTypes.Add(argType);
+
+                                    if (genericTypes.TryGetValue(nameType.Name, out var genericType) && genericType != argType)
+                                    {
+                                        callExprSyntax.Tree.PushDiagnostic(new Diagnostics.Diagnostic(Diagnostics.DiagnosticSeverity.Error,
+                                            Diagnostics.DiagnosticCode.TypeNotFound,
+                                            $"The type arguments for method '{callExprSyntax.Name}' cannot be inferred from the usage.Try specifying the type arguments explicitly.",
+                                            callExprSyntax.Range));
+                                        continue;
+                                    }
+
+                                    genericTypes[nameType.Name] = argType;
+                                    continue;
+                                }
+                            }
+                        }
+
+                        paramTypes.Add(parameterSymbols[i].Type);
+                    }
+                }
+                else
+                {
+                    for (int i = 0; i < parameterSymbols.Count; i++)
+                    {
+                        paramTypes.Add(parameterSymbols[i].Type);
+                    }
+                }
+
+
+                if (argTypes.Count > paramTypes.Count)
                 {
                     callExprSyntax.Tree.PushDiagnostic(new Diagnostics.Diagnostic(Diagnostics.DiagnosticSeverity.Error,
                         Diagnostics.DiagnosticCode.Unused,
@@ -261,26 +325,23 @@ namespace EmmyLua.CodeAnalysis.Compilation.Analyzer.TypeAnalyzer
                 int indexParam = 0;
                 for (int indexArg = 0; indexArg < argTypes.Count; indexArg++)
                 {
-                    if (indexParam < parameters.Count)
+                    if (indexParam < paramTypes.Count)
                     {
-                        ParamMatch(parameters[indexParam]?.Type, argTypes[indexArg], callExprSyntax);
+                        ParamMatch(paramTypes[indexParam], argTypes[indexArg], callExprSyntax, methodType);
                     }
                     indexParam++;
                 }
             }
         }
 
-        private void ParamMatch(LuaType? parameterType, LuaType? argType, LuaCallExprSyntax callExprSyntax)
+        private void ParamMatch(LuaType? parameterType, LuaType? argType, LuaCallExprSyntax callExprSyntax, LuaMethodType methodType)
         {
-            if (parameterType != null)
+            if (!MatchType(parameterType, argType))
             {
-                if (argType == null || (!argType.IsSameType(parameterType, searchContext) && !argType.SubTypeOf(parameterType, searchContext)))
-                {
-                    callExprSyntax?.Tree.PushDiagnostic(new Diagnostics.Diagnostic(Diagnostics.DiagnosticSeverity.Error,
-                        Diagnostics.DiagnosticCode.TypeNotMatch,
-                        $"TypeNotMatch {parameterType} = {argType}",
-                        callExprSyntax.Range));
-                }
+                callExprSyntax?.Tree.PushDiagnostic(new Diagnostics.Diagnostic(Diagnostics.DiagnosticSeverity.Error,
+                    Diagnostics.DiagnosticCode.TypeNotMatch,
+                    $"TypeNotMatch {parameterType} = {argType}",
+                    callExprSyntax.Range));
             }
         }
 
@@ -376,6 +437,9 @@ namespace EmmyLua.CodeAnalysis.Compilation.Analyzer.TypeAnalyzer
 
         private void AnalyzeAssignStat(LuaAssignStatSyntax assignStatSyntax)
         {
+            if (null == searchContext)
+                return;
+
             var varList = assignStatSyntax.VarList.ToList();
             var exprList = assignStatSyntax.ExprList.ToList();
             LuaExprSyntax? lastValidExpr = null;
@@ -395,19 +459,13 @@ namespace EmmyLua.CodeAnalysis.Compilation.Analyzer.TypeAnalyzer
                     retId++;
                 }
 
-                LuaExprRef? relatedExpr = null;
-                if (lastValidExpr is not null)
-                {
-                    relatedExpr = new LuaExprRef(lastValidExpr, retId);
-                }
-
                 if (varExpr is not null && expr is not null)
                 {
                     var varExprType = searchContext.Infer(varExpr);
                     var exprType = searchContext.Infer(expr);
                     if (varExprType is not null && exprType is not null)
                     {
-                        if (!varExprType.IsSameType(exprType, this.searchContext) && !varExprType.SubTypeOf(exprType, searchContext))
+                        if (!MatchType(varExprType, exprType))
                         {
                             assignStatSyntax.Tree.PushDiagnostic(new Diagnostics.Diagnostic(Diagnostics.DiagnosticSeverity.Error,
                                 Diagnostics.DiagnosticCode.TypeNotMatch,
@@ -469,6 +527,9 @@ namespace EmmyLua.CodeAnalysis.Compilation.Analyzer.TypeAnalyzer
 
         private void AnalyzeLocalStat(LuaLocalStatSyntax localStatSyntax)
         {
+            if (null == searchContext)
+                return;
+
             var nameList = localStatSyntax.NameList.ToList();
             var exprList = localStatSyntax.ExprList.ToList();
             LuaExprSyntax? lastValidExpr = null;
@@ -488,21 +549,15 @@ namespace EmmyLua.CodeAnalysis.Compilation.Analyzer.TypeAnalyzer
                     retId++;
                 }
 
-                LuaExprRef? relatedExpr = null;
-                if (lastValidExpr is not null)
-                {
-                    relatedExpr = new LuaExprRef(lastValidExpr, retId);
-                }
-
                 if (localName is not null && expr is not null)
                 {
-                    var leftSymbol = searchContext.FindDeclaration(localName);
-                    //var localNameType = searchContext.Infer(localName);
-                    var localNameType = leftSymbol == null ? null : leftSymbol.Type;
+                    //var leftSymbol = searchContext.FindDeclaration(localName);
+                    //var localNameType = leftSymbol == null ? null : leftSymbol.Type;
+                    var localNameType = searchContext.Infer(localName);
                     var exprType = searchContext.Infer(expr);
                     if (localNameType is not null && exprType is not null)
                     {
-                        if (!localNameType.IsSameType(exprType, this.searchContext) && !exprType.SubTypeOf(localNameType, searchContext))
+                        if (!MatchType(localNameType, exprType))
                         {
                             localStatSyntax.Tree.PushDiagnostic(new Diagnostics.Diagnostic(Diagnostics.DiagnosticSeverity.Error,
                                 Diagnostics.DiagnosticCode.TypeNotMatch,

@@ -55,6 +55,13 @@ public class SearchContext
         return ElementInfer.Infer(element);
     }
 
+    public void SetCacheType(LuaSyntaxElement? element, LuaType luaType)
+    {
+        if (element == null) return;
+
+        ElementInfer.SetCacheType(element.UniqueId, luaType);
+    }
+
     // public void ClearMemberCache(LuaType luaType)
     // {
     //     // Members.ClearMember(luaType);
