@@ -32,11 +32,13 @@ namespace EmmyLua.CodeAnalysis.Compilation.Analyzer.TypeAnalyzer
 
         public bool MatchType(LuaType? leftType, LuaType? rightType)
         {
-            if (null == leftType)return false;
+            if (null == leftType)return true;
             if (null == rightType)return false;
             if (null == searchContext) return false;
 
             if (Builtin.Any.IsSameType(leftType, searchContext))
+                return true;
+            if (Builtin.Unknown.IsSameType(leftType, searchContext))
                 return true;
             if (Builtin.Number.IsSameType(leftType, searchContext) && Builtin.Integer.IsSameType(rightType, searchContext))
                 return true;
@@ -340,7 +342,7 @@ namespace EmmyLua.CodeAnalysis.Compilation.Analyzer.TypeAnalyzer
             {
                 callExprSyntax?.Tree.PushDiagnostic(new Diagnostics.Diagnostic(Diagnostics.DiagnosticSeverity.Error,
                     Diagnostics.DiagnosticCode.TypeNotMatch,
-                    $"TypeNotMatch {parameterType} = {argType}",
+                    $"Cannot implicitly convert type '{argType}' to '{parameterType}'",
                     callExprSyntax.Range));
             }
         }
@@ -387,7 +389,19 @@ namespace EmmyLua.CodeAnalysis.Compilation.Analyzer.TypeAnalyzer
 
         private void IndexIndexExpr(LuaIndexExprSyntax indexExpr)
         {
-            
+            if (null == searchContext)
+                return;
+            if (indexExpr.IsKeyIndex)
+                return;
+
+            var type = searchContext.Infer(indexExpr);
+            if (Builtin.Unknown.IsSameType(type, searchContext))
+            {
+                indexExpr.Tree.PushDiagnostic(new Diagnostics.Diagnostic(Diagnostics.DiagnosticSeverity.Error,
+                    Diagnostics.DiagnosticCode.TypeNotMatch,
+                    $"'{indexExpr.PrefixExpr.Text}' does not contain a definition for '{indexExpr.Name ?? ""}' ",
+                    indexExpr.Range));
+            }
         }
 
         private void AnalyzeNameExpr(LuaNameExprSyntax nameExpr)
@@ -469,7 +483,7 @@ namespace EmmyLua.CodeAnalysis.Compilation.Analyzer.TypeAnalyzer
                         {
                             assignStatSyntax.Tree.PushDiagnostic(new Diagnostics.Diagnostic(Diagnostics.DiagnosticSeverity.Error,
                                 Diagnostics.DiagnosticCode.TypeNotMatch,
-                                $"TypeNotMatch {varExprType} = {exprType}",
+                                $"Cannot implicitly convert type '{exprType}' to '{varExprType}'",
                                 assignStatSyntax.Range));
                         }
                     }
@@ -561,7 +575,7 @@ namespace EmmyLua.CodeAnalysis.Compilation.Analyzer.TypeAnalyzer
                         {
                             localStatSyntax.Tree.PushDiagnostic(new Diagnostics.Diagnostic(Diagnostics.DiagnosticSeverity.Error,
                                 Diagnostics.DiagnosticCode.TypeNotMatch,
-                                $"TypeNotMatch {localNameType} = {exprType}",
+                                $"Cannot implicitly convert type '{exprType}' to '{localNameType}'",
                                 localStatSyntax.Range));
                         }
                     }

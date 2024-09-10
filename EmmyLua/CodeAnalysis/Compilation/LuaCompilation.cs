@@ -143,7 +143,7 @@ public class LuaCompilation
                     }
                 }
 
-                var searchContext = new SearchContext(this, new SearchContextFeatures() { });
+                var searchContext = new SearchContext(this, new SearchContextFeatures() { CacheUnknown = false });
                 var analyzeContext = new AnalyzeContext(documents, searchContext);
                 foreach (var analyzer in Analyzers)
                 {

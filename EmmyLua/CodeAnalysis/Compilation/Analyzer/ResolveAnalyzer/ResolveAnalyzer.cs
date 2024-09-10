@@ -144,8 +144,10 @@ public class ResolveAnalyzer(LuaCompilation compilation) : LuaAnalyzer(compilati
         if (unResolved is UnResolvedSymbol unResolvedDeclaration)
         {
             var declaration = unResolvedDeclaration.LuaSymbol;
-            if (declaration.Info.Ptr.ToNode(Context) is LuaIndexExprSyntax { PrefixExpr: { } prefixExpr })
+            var node = declaration.Info.Ptr.ToNode(Context);
+            if (node is LuaIndexExprSyntax { PrefixExpr: { } prefixExpr })
             {
+                Context.Infer(node);
                 var ty = Context.Infer(prefixExpr);
                 if (ty is LuaNamedType namedType)
                 {
