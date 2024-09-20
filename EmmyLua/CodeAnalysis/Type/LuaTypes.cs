@@ -259,7 +259,7 @@ public class LuaMethodType(LuaSignature mainSignature, List<LuaSignature>? overl
 {
     public LuaSignature MainSignature { get; } = mainSignature;
 
-    public List<LuaSignature>? Overloads { get; } = overloads;
+    public List<LuaSignature>? Overloads { get; set; } = overloads;
 
     public bool ColonDefine { get; } = colonDefine;
 

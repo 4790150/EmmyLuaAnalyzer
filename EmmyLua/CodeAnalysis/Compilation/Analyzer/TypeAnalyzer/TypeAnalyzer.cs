@@ -6,6 +6,7 @@ using EmmyLua.CodeAnalysis.Compilation.Symbol;
 using EmmyLua.CodeAnalysis.Syntax.Node;
 using EmmyLua.CodeAnalysis.Syntax.Node.SyntaxNodes;
 using EmmyLua.CodeAnalysis.Type;
+using System.ComponentModel.Design;
 using System.Security.AccessControl;
 using System.Xml.Linq;
 
@@ -32,17 +33,77 @@ namespace EmmyLua.CodeAnalysis.Compilation.Analyzer.TypeAnalyzer
 
         public bool MatchType(LuaType? leftType, LuaType? rightType)
         {
-            if (null == leftType)return true;
-            if (null == rightType)return false;
+            List<LuaType?> leftTypes = new();
+            if (leftType is LuaUnionType leftUnionType)
+                leftTypes.AddRange(leftUnionType.UnionTypes);
+            else
+                leftTypes.Add(leftType);
+
+            List<LuaType?> rightTypes = new();
+            if (rightType is LuaUnionType rightUnionType)
+                rightTypes.AddRange(rightUnionType.UnionTypes);
+            else
+                rightTypes.Add(rightType);
+
+            foreach (var left in leftTypes)
+            {
+                foreach (var right in rightTypes)
+                {
+                    if (MatchSingleType(left, right))
+                        return true;
+                }
+            }
+
+            return false;
+        }
+
+        public bool MatchSingleType(LuaType? leftType, LuaType? rightType)
+        {
+            if (null == leftType) return true;
+            if (null == rightType) return true;
             if (null == searchContext) return false;
 
+            if (leftType is LuaNamedType leftNamedType)
+            {
+                var leftTypeInfo = Compilation.TypeManager.FindTypeInfo(leftNamedType);
+                if (null != leftTypeInfo && null != leftTypeInfo.BaseType)
+                    leftType = leftTypeInfo.BaseType;
+            }
+            else if (leftType is LuaElementType leftElementType)
+            {
+                var leftBaseType = Compilation.TypeManager.GetBaseType(leftElementType.Id);
+                if (null != leftBaseType)
+                    leftType = leftBaseType;
+            }
+
+            if (rightType is LuaNamedType rightNamedType)
+            {
+                var rightTypeInfo = Compilation.TypeManager.FindTypeInfo(rightNamedType);
+                if (null != rightTypeInfo && null != rightTypeInfo.BaseType)
+                    rightType = rightTypeInfo.BaseType;
+            }
+            else if (rightType is LuaElementType rightElementType)
+            {
+                var rightBaseType = Compilation.TypeManager.GetBaseType(rightElementType.Id);
+                if (null != rightBaseType)
+                    rightType = rightBaseType;
+            }
+
+            if (Builtin.Nil.IsSameType(rightType, searchContext))
+                return true;
+            if (Builtin.Variable.IsSameType(leftType, searchContext))
+                return true;
             if (Builtin.Any.IsSameType(leftType, searchContext))
                 return true;
             if (Builtin.Unknown.IsSameType(leftType, searchContext))
                 return true;
+            if (Builtin.Unknown.IsSameType(rightType, searchContext))
+                return true;
             if (Builtin.Number.IsSameType(leftType, searchContext) && Builtin.Integer.IsSameType(rightType, searchContext))
                 return true;
-
+            if (leftType is LuaMethodType && rightType is LuaMethodType)
+                return true;
+             
             if (leftType.IsSameType(rightType, searchContext))
                 return true;
             if (rightType.SubTypeOf(leftType, searchContext))
@@ -257,21 +318,16 @@ namespace EmmyLua.CodeAnalysis.Compilation.Analyzer.TypeAnalyzer
             {
                 var argTypes = new List<LuaType>();
                 if (fun is LuaIndexExprSyntax indexExpr && indexExpr.IsColonIndex)
-                {
-                    var argSelf = searchContext.Infer(indexExpr.PrefixExpr);
-                    argTypes.Add(argSelf);
-                }
+                    argTypes.Add(searchContext.Infer(indexExpr.PrefixExpr));
                 foreach (var arg in callExprSyntax.ArgList.ArgList)
-                {
                     argTypes.Add(searchContext.Infer(arg));
-                }
+
+                LuaSignature signature = MethodMatch(methodType, argTypes);
 
                 var parameterSymbols = new List<LuaSymbol>();
-                if (methodType.MainSignature.Self != null)
-                {
-                    parameterSymbols.Add(methodType.MainSignature.Self);
-                }
-                parameterSymbols.AddRange(methodType.MainSignature.Parameters);
+                if (signature.Self != null)
+                    parameterSymbols.Add(signature.Self);
+                parameterSymbols.AddRange(signature.Parameters);
 
                 var paramTypes = new List<LuaType?>();
                 if (methodType is LuaGenericMethodType genericMethodType)
@@ -302,21 +358,27 @@ namespace EmmyLua.CodeAnalysis.Compilation.Analyzer.TypeAnalyzer
                                     continue;
                                 }
                             }
-                        }
 
-                        paramTypes.Add(parameterSymbols[i].Type);
+                            paramTypes.Add(parameterSymbols[i].Type);
+                        }
+                        else if (parameterSymbols[i].Type is LuaUnionType unionType)
+                        {
+                            return;
+                        }
                     }
                 }
                 else
                 {
                     for (int i = 0; i < parameterSymbols.Count; i++)
                     {
-                        paramTypes.Add(parameterSymbols[i].Type);
+                        if (parameterSymbols[i].Name == "...")
+                            paramTypes.Add(Builtin.Variable);
+                        else
+                            paramTypes.Add(parameterSymbols[i].Type);
                     }
                 }
 
-
-                if (argTypes.Count > paramTypes.Count)
+                if (argTypes.Count > paramTypes.Count && !Builtin.Variable.IsSameType(paramTypes.LastOrDefault(), searchContext))
                 {
                     callExprSyntax.Tree.PushDiagnostic(new Diagnostics.Diagnostic(Diagnostics.DiagnosticSeverity.Error,
                         Diagnostics.DiagnosticCode.Unused,
@@ -329,14 +391,48 @@ namespace EmmyLua.CodeAnalysis.Compilation.Analyzer.TypeAnalyzer
                 {
                     if (indexParam < paramTypes.Count)
                     {
-                        ParamMatch(paramTypes[indexParam], argTypes[indexArg], callExprSyntax, methodType);
+                        ParamMatch(paramTypes[indexParam], argTypes[indexArg], callExprSyntax);
                     }
                     indexParam++;
                 }
             }
         }
 
-        private void ParamMatch(LuaType? parameterType, LuaType? argType, LuaCallExprSyntax callExprSyntax, LuaMethodType methodType)
+        private LuaSignature MethodMatch(LuaMethodType methodType, List<LuaType> argTypes)
+        {
+            List<LuaSignature> signatures = new List<LuaSignature>() { methodType.MainSignature };
+            if (null != methodType.Overloads)
+                signatures.AddRange(methodType.Overloads);
+
+            var paramTypes = new List<LuaType?>();
+            for (int indexSignature = signatures.Count - 1; indexSignature >= 0; indexSignature--)
+            {
+                var signature = signatures[indexSignature];
+
+                if (signature.Self != null)
+                    paramTypes.Add(signature.Self.Type);
+                foreach (var param in signature.Parameters)
+                    paramTypes.AddRange(param.Type);
+
+                for (int indexParam = 0; indexParam < argTypes.Count; indexParam++)
+                {
+                    if (indexParam >= paramTypes.Count || !MatchType(paramTypes[indexParam], argTypes[indexParam]))
+                    {
+                        signatures.RemoveAt(indexSignature);
+                        break;
+                    }
+                }
+
+                paramTypes.Clear();
+            }
+
+            if (signatures.Count > 0)
+                return signatures[0];
+
+            return methodType.MainSignature;
+        }
+
+        private void ParamMatch(LuaType? parameterType, LuaType? argType, LuaCallExprSyntax callExprSyntax)
         {
             if (!MatchType(parameterType, argType))
             {

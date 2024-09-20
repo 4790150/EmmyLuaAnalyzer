@@ -147,12 +147,17 @@ public class ResolveAnalyzer(LuaCompilation compilation) : LuaAnalyzer(compilati
             var node = declaration.Info.Ptr.ToNode(Context);
             if (node is LuaIndexExprSyntax { PrefixExpr: { } prefixExpr })
             {
-                Context.Infer(node);
+                if (null != unResolvedDeclaration.ExprRef)
+                {
+                    var typeInfo = Compilation.TypeManager.FindTypeInfo(unResolvedDeclaration.ExprRef.Expr.UniqueId);
+                    declaration.Type = typeInfo?.BaseType;
+                }
+
                 var ty = Context.Infer(prefixExpr);
                 if (ty is LuaNamedType namedType)
                 {
                     Compilation.TypeManager.AddMemberImplementation(namedType, declaration);
-                }
+                }              
                 else if (ty is LuaElementType elementType)
                 {
                     Compilation.TypeManager.AddElementMember(elementType.Id, declaration);

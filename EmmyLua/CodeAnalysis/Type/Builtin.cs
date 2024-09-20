@@ -20,4 +20,6 @@ public static class Builtin
     public static LuaNamedType Global { get; } = new(LuaDocumentId.VirtualDocumentId, "global");
 
     public static LuaNamedType Namespace { get; } = new(LuaDocumentId.VirtualDocumentId, "namespace");
+
+    public static LuaNamedType Variable { get; } = new(LuaDocumentId.VirtualDocumentId, "Variable");
 }

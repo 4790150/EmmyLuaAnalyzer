@@ -61,7 +61,7 @@ public partial class DeclarationWalker
             }
             case { IsMethod: true, IndexExpr: { } indexExpr, ClosureExpr: { } closureExpr }:
             {
-                if (indexExpr is { Name: { } name })
+               if (indexExpr is { Name: { } name })
                 {
                     var declaration = new LuaSymbol(
                         name,

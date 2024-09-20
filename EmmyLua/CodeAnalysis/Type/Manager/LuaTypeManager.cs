@@ -299,7 +299,7 @@ public class LuaTypeManager(LuaCompilation compilation)
             return;
         }
 
-        if (typeInfo.IsDefinedInDocument(member.DocumentId) || typeInfo.Global)
+        //if (typeInfo.IsDefinedInDocument(member.DocumentId) || typeInfo.Global)
         {
             typeInfo.Declarations ??= new();
             typeInfo.Implements ??= new();
@@ -313,7 +313,15 @@ public class LuaTypeManager(LuaCompilation compilation)
             else
             {
                 typeInfo.Implements.TryAdd(member.Name, member);
-                typeInfo.Declarations.TryAdd(member.Name, member);
+                if (!typeInfo.Declarations.TryAdd(member.Name, member))
+                {
+                    var existMember = typeInfo.Declarations[member.Name];
+                    if (member.Type is LuaMethodType methodType && existMember.Type is LuaMethodType existMethodType)
+                    {
+                        existMethodType.Overloads ??= new();
+                        existMethodType.Overloads.Add(methodType.MainSignature);
+                    }
+                }
             }
         }
     }
@@ -346,7 +354,15 @@ public class LuaTypeManager(LuaCompilation compilation)
             if (member.DocumentId == elementId.DocumentId)
             {
                 typeInfo.Declarations ??= new();
-                typeInfo.Declarations.TryAdd(member.Name, member);
+                if (!typeInfo.Declarations.TryAdd(member.Name, member))
+                {
+                    var existMember = typeInfo.Declarations[member.Name];
+                    if (member.Type is LuaMethodType methodType && existMember.Type is LuaMethodType existMethodType)
+                    {
+                        existMethodType.Overloads ??= new();
+                        existMethodType.Overloads.Add(methodType.MainSignature);
+                    }
+                }
             }
         }
     }
